@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: data-processor
+  labels:
+    app: data-processor
+    demo: "k8s-healing-agent"
+    scenario: "3"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: data-processor
+  template:
+    metadata:
+      labels:
+        app: data-processor
+        demo: "k8s-healing-agent"
+        scenario: "3"
+    spec:
+      containers:
+        - name: data-processor
+          image: python:3.12-slim
+          command:
+            - python
+            - "-c"
+            - "import time; data = ['x' * 1024] * 1024 * 50; time.sleep(3600)"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "16Mi"
+            limits:
+              cpu: "200m"
+              memory: "32Mi"

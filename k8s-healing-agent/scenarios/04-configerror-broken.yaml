@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: config-service
+  labels:
+    app: config-service
+    demo: "k8s-healing-agent"
+    scenario: "4"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: config-service
+  template:
+    metadata:
+      labels:
+        app: config-service
+        demo: "k8s-healing-agent"
+        scenario: "4"
+    spec:
+      containers:
+        - name: config-service
+          image: nginx:latest
+          envFrom:
+            - configMapRef:
+                name: app-config
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"

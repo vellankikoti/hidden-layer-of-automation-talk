@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ml-worker
+  labels:
+    app: ml-worker
+    demo: "k8s-healing-agent"
+    scenario: "5"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ml-worker
+  template:
+    metadata:
+      labels:
+        app: ml-worker
+        demo: "k8s-healing-agent"
+        scenario: "5"
+    spec:
+      containers:
+        - name: ml-worker
+          image: nginx:latest
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              # INTENTIONAL: 100 cores — impossible on any real node.
+              # This triggers the Pending/Unschedulable failure state for Scenario 5.
+              cpu: "100"
+              memory: "64Mi"
+            limits:
+              # INTENTIONAL: 200 cores limit to match the impossible request.
+              cpu: "200"
+              memory: "128Mi"
