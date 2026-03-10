@@ -100,14 +100,32 @@ def _classify_pod(pod: Any) -> Tuple[str, str, str, int, str, str]:
         if pod.status.container_statuses:
             for cs in pod.status.container_statuses:
                 if not cs.ready:
-                    # Could still be starting; check waiting reason
+                    # Check waiting reason (e.g. CrashLoopBackOff, ImagePullBackOff)
                     if cs.state and cs.state.waiting and cs.state.waiting.reason:
                         reason = cs.state.waiting.reason
+                        # Also capture terminated reason from last_state for OOMKilled detection
+                        term_reason = ""
+                        if cs.last_state and cs.last_state.terminated and cs.last_state.terminated.reason:
+                            term_reason = cs.last_state.terminated.reason
                         if reason in STUCK_REASONS:
-                            return (STUCK, reason, "", cs.restart_count or 0,
+                            return (STUCK, reason, term_reason, cs.restart_count or 0,
                                     cs.name, cs.image or "")
                         if reason in FAILING_REASONS:
-                            return (FAILING, reason, "", cs.restart_count or 0,
+                            return (FAILING, reason, term_reason, cs.restart_count or 0,
+                                    cs.name, cs.image or "")
+                    # Check if the container is currently terminated (between restarts,
+                    # before CrashLoopBackOff kicks in — e.g. OOMKilled)
+                    if cs.state and cs.state.terminated and cs.state.terminated.reason:
+                        term_reason = cs.state.terminated.reason
+                        if term_reason in FAILING_REASONS:
+                            return (FAILING, term_reason, term_reason, cs.restart_count or 0,
+                                    cs.name, cs.image or "")
+                    # Check last_state.terminated even if current state is unclear
+                    # (catches OOMKilled after container has been restarted)
+                    if cs.last_state and cs.last_state.terminated and cs.last_state.terminated.reason:
+                        term_reason = cs.last_state.terminated.reason
+                        if term_reason in FAILING_REASONS:
+                            return (FAILING, term_reason, term_reason, cs.restart_count or 0,
                                     cs.name, cs.image or "")
         return (HEALTHY, "Running", "", 0,
                 pod.status.container_statuses[0].name if pod.status.container_statuses else "",
@@ -117,12 +135,22 @@ def _classify_pod(pod: Any) -> Tuple[str, str, str, int, str, str]:
         if pod.status.container_statuses:
             for cs in pod.status.container_statuses:
                 waiting = cs.state.waiting if cs.state else None
+                term_reason = ""
+                if cs.last_state and cs.last_state.terminated and cs.last_state.terminated.reason:
+                    term_reason = cs.last_state.terminated.reason
                 if waiting and waiting.reason:
                     r = waiting.reason
                     if r in STUCK_REASONS:
-                        return (STUCK, r, "", cs.restart_count or 0, cs.name, cs.image or "")
+                        return (STUCK, r, term_reason, cs.restart_count or 0, cs.name, cs.image or "")
                     if r in FAILING_REASONS:
-                        return (FAILING, r, "", cs.restart_count or 0, cs.name, cs.image or "")
+                        return (FAILING, r, term_reason, cs.restart_count or 0, cs.name, cs.image or "")
+                # Container may be terminated (e.g. OOMKilled) while pod is still Pending
+                if cs.state and cs.state.terminated and cs.state.terminated.reason:
+                    tr = cs.state.terminated.reason
+                    if tr in FAILING_REASONS:
+                        return (FAILING, tr, tr, cs.restart_count or 0, cs.name, cs.image or "")
+                if term_reason and term_reason in FAILING_REASONS:
+                    return (FAILING, term_reason, term_reason, cs.restart_count or 0, cs.name, cs.image or "")
         return (UNSCHEDULABLE, "Pending", "", 0,
                 pod.spec.containers[0].name if pod.spec.containers else "",
                 pod.spec.containers[0].image if pod.spec.containers else "")
@@ -238,11 +266,21 @@ class Observer:
                 continue
 
             for obs in observations:
+                # Match on status_reason (e.g. CrashLoopBackOff) or
+                # terminated_reason (e.g. OOMKilled) for early detection
+                matched_reason = ""
                 if obs.status_reason in expected_reasons:
+                    matched_reason = obs.status_reason
+                elif obs.terminated_reason in expected_reasons:
+                    matched_reason = obs.terminated_reason
+
+                if matched_reason:
                     print_detect(
                         f"DETECTED: Pod {obs.name}"
                     )
-                    print_info(f"Status: {obs.status_reason}")
+                    print_info(f"Status: {matched_reason}")
+                    if obs.terminated_reason and obs.terminated_reason != matched_reason:
+                        print_info(f"Terminated reason: {obs.terminated_reason}")
                     if obs.pod.status and obs.pod.status.container_statuses:
                         cs = obs.pod.status.container_statuses[0]
                         waiting = cs.state.waiting if cs.state else None

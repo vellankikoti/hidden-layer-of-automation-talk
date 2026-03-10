@@ -182,7 +182,10 @@ def run_scenario(
         # Pending pod — wait for it to be stuck in Pending
         obs = observer.wait_for_pending(depl, min_seconds=10, timeout=120)
     else:
-        obs = observer.wait_for_failure(depl, scenario["expected_reasons"], timeout=120)
+        # Use a longer timeout for OOMKill (scenario 3) because the python:3.12-slim
+        # image may need to be pulled first, and OOMKill only happens after startup
+        wait_timeout = 180 if scenario_num == 3 else 120
+        obs = observer.wait_for_failure(depl, scenario["expected_reasons"], timeout=wait_timeout)
 
     if obs is None:
         print_error("Timed out waiting for failure state. Scenario aborted.")
