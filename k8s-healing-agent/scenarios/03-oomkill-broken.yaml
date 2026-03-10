@@ -24,7 +24,7 @@ spec:
           command:
             - python
             - "-c"
-            - "import time; data = ['x' * 1024] * 1024 * 50; time.sleep(3600)"
+            - "data = bytearray(50 * 1024 * 1024); import time; time.sleep(3600)"
           resources:
             requests:
               cpu: "100m"

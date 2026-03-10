@@ -328,6 +328,38 @@ def _wait_for_keypress(message: str = "Press Enter to return to the menu...") ->
         pass
 
 
+def _prompt_cleanup(namespace: str) -> None:
+    """
+    After a scenario completes, ask the speaker if they want to clean up
+    resources so they don't conflict with subsequent scenarios or existing
+    workloads in the cluster.
+    """
+    print()
+    print(_c(Color.YELLOW,
+        "  ┌──────────────────────────────────────────────────────────────┐"))
+    print(_c(Color.YELLOW,
+        "  │  🧹 Clean up scenario resources?                           │"))
+    print(_c(Color.YELLOW,
+        "  │                                                            │"))
+    print(_c(Color.YELLOW,
+        "  │  Recommended before running another scenario to avoid      │"))
+    print(_c(Color.YELLOW,
+        "  │  conflicts with existing workloads in the cluster.         │"))
+    print(_c(Color.YELLOW,
+        "  └──────────────────────────────────────────────────────────────┘"))
+    print()
+    try:
+        answer = input(f"  {_c(Color.BOLD, 'Clean up? [yes/no]: ')}").strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return
+
+    if answer in ("yes", "y", "clean", "cleanup"):
+        _cleanup_all(namespace)
+    else:
+        print_info("Skipping cleanup — resources left in cluster.")
+
+
 # ╔════════════════════════════════════════════════════════════════════════════╗
 # ║                                                                          ║
 # ║               CLUSTER HELPERS & PREFLIGHT CHECKS                         ║
@@ -731,6 +763,7 @@ def demo_loop(namespace: str, core_v1: client.CoreV1Api, apps_v1: client.AppsV1A
                 except Exception as exc:
                     print_error(f"Scenario {num} failed: {exc}")
             learner.print_session_summary()
+            _prompt_cleanup(namespace)
             _wait_for_keypress()
 
         elif choice in ("1", "2", "3", "4", "5"):
@@ -749,6 +782,7 @@ def demo_loop(namespace: str, core_v1: client.CoreV1Api, apps_v1: client.AppsV1A
                 print_info("Scenario interrupted.")
             except Exception as exc:
                 print_error(f"Scenario {num} failed: {exc}")
+            _prompt_cleanup(namespace)
             _wait_for_keypress()
 
         else:
