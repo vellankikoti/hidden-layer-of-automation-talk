@@ -78,7 +78,17 @@ The agent auto-detects in-cluster vs kubeconfig configuration.
 
 ## Usage
 
-### Interactive Demo (Recommended for talks)
+### Speaker-Controlled Interactive Demo (Recommended for talks)
+
+```bash
+python3 interactive-demo.py
+```
+
+In this mode the agent **detects and diagnoses** the issue, then **pauses** and
+asks you to approve the fix before applying it. The audience sees the problem
+first, then watches the agent heal it on your signal.
+
+### Fully Autonomous Demo (Zero intervention)
 
 ```bash
 python3 demo.py
@@ -170,7 +180,8 @@ k8s-healing-agent/
 │   ├── display.py               # Terminal UI: colors, emojis
 │   └── runbook.py               # Pattern database: known issues → fixes
 │
-└── demo.py                      # Interactive demo runner
+├── demo.py                      # Fully autonomous demo runner
+└── interactive-demo.py          # Speaker-controlled demo (pause before fix)
 ```
 
 ---
